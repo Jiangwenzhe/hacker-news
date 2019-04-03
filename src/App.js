@@ -35,8 +35,7 @@ class App extends Component {
       method: 'GET',
       mode: 'cors',
       cache: 'default'
-    })
-      .then(response => response.json())
+    }).then(response => response.json())
       .then(result => this.setSearchTopStories(result))
       .then(e => e);
   }
