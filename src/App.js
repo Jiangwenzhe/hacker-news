@@ -18,10 +18,13 @@ class App extends Component {
   constructor(props) {
     super(props);
     this.state = {
-      result: null,
+      results: null,
+      searchKey: '',
       searchTerm: DEFAULT_QUERY,
+      error: null,
     };
 
+    this.needsToSearchTopStories = this.needsToSearchTopStories.bind(this);
     this.setSearchTopStories = this.setSearchTopStories.bind(this);
     this.fetchSearchTopStories = this.fetchSearchTopStories.bind(this);
     this.onDismiss = this.onDismiss.bind(this);
@@ -32,12 +35,14 @@ class App extends Component {
 
   setSearchTopStories(result) {
     const { hits, page } = result;
-    const oldHits = page !==0 ? this.state.result.hits : [];
+    const { searchKey, results } = this.state;
+    const oldHits = results && results[searchKey] ? results[searchKey].hits : [];
     const updatedHits = [...oldHits, ...hits];
-    console.log(updatedHits)
-    console.log(page);
     this.setState({
-      result : { hits: updatedHits, page }
+      results: {
+        ...results,
+        [searchKey]: { hits: updatedHits, page }
+       }
     });
   }
 
@@ -48,20 +53,30 @@ class App extends Component {
       cache: 'default'
     }).then(response => response.json())
       .then(result => this.setSearchTopStories(result))
-      .then(e => e);
+      .then(e => this.setState({ error: e }));
+  }
+
+  needsToSearchTopStories(searchTerm) {
+    const { results} = this.state;
+    return !results[searchTerm];
   }
 
   componentDidMount() {
     const { searchTerm } = this.state;
+    this.setState({ searchKey: searchTerm });
     this.fetchSearchTopStories(searchTerm);
   }
 
   onDismiss(id) {
+   const { searchKey, results } = this.state;
+   const { hits, page } = results[searchKey];
    const isNotId = item => item.objectID !== id;
-   const updatedList = this.state.result.hits.filter(isNotId);
+   const updatedHits = hits.filter(isNotId);
    this.setState({
      //result: Object.assign({}, this.state.result, { hits: updatedList })
-     result: { ...this.state.result, hits: updatedList }
+     results: {
+       ...results,
+       [searchKey]: { hits: updatedHits, page }}
     });
   }
 
@@ -71,15 +86,31 @@ class App extends Component {
 
   onSearchSubmit(event) {
     const { searchTerm } = this.state;
-    this.fetchSearchTopStories(searchTerm);
+    this.setState({ searchKey: searchTerm });
+    if (this.needsToSearchTopStories(searchTerm)) {
+      this.fetchSearchTopStories(searchTerm);
+    }
     event.preventDefault();
   }
-
   render() {
-    console.log(this.state.result);
     //解构赋值
-    const { result, searchTerm } = this.state;
-    const page = (result && result.page) || 0;
+    const {
+      searchTerm,
+      results,
+      searchKey,
+      error
+    } = this.state;
+    //条件渲染
+    const page = (
+      results &&
+      results[searchKey] &&
+      results[searchKey].page
+    ) || 0;
+    const list = (
+      results &&
+      results[searchKey] &&
+      results[searchKey].hits
+    ) || [];
     return (
       <div className="page">
         <div className="interactions">
@@ -91,10 +122,14 @@ class App extends Component {
             Search
           </Search>
         </div>
-        {/* 条件渲染，如果result是空的话，就直接跳过，如果不是，就接着渲染table组件 */}
-        { result &&
-          <Table
-            list={result.hits}
+        {/* 条件渲染 */}
+        {
+          error
+          ? <div className="interactions">
+            <p>出错啦！</p>
+          </div>
+          : <Table
+            list={list}
             onDismiss={this.onDismiss}
           />
         }
